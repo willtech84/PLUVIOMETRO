@@ -1,0 +1,15 @@
+{
+  "short_name": "Pluviômetro",
+  "name": "Pluviômetro Digital",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#2563eb",
+  "background_color": "#f1f5f9",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1163/1163624.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png"
+    }
+  ]
+}
