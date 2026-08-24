@@ -1,9 +1,9 @@
 // ================================================
 // SERVICE WORKER — Pluviômetro Digital
-// Versão: 1.2.0
+// Versão: 1.3.0 — auditoria offline
 // ================================================
 
-var CACHE_NAME = 'pluviometro-v1.2.0';
+var CACHE_NAME = 'pluviometro-v1.3.0';
 
 var ASSETS_TO_CACHE = [
   './',
@@ -11,20 +11,37 @@ var ASSETS_TO_CACHE = [
   './manifest.json'
 ];
 
-// ── Instalação: salva arquivos no cache ──
+var CDN_HOSTS = [
+  'cdn.tailwindcss.com',
+  'esm.sh',
+  'unpkg.com'
+];
+
+var API_HOSTS = [
+  'api.open-meteo.com',
+  'viacep.com.br',
+  'nominatim.openstreetmap.org',
+  'maps.google.com',
+  'script.google.com'
+];
+
+function isHost(url, hosts) {
+  try {
+    return hosts.indexOf(new URL(url).hostname) !== -1;
+  } catch (e) {
+    return false;
+  }
+}
+
 self.addEventListener('install', function(event) {
   console.log('[SW] Instalando versão: ' + CACHE_NAME);
   event.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(ASSETS_TO_CACHE);
-    }).then(function() {
-      // Ativa imediatamente sem esperar fechar abas
-      return self.skipWaiting();
-    })
+    caches.open(CACHE_NAME)
+      .then(function(cache) { return cache.addAll(ASSETS_TO_CACHE); })
+      .then(function() { return self.skipWaiting(); })
   );
 });
 
-// ── Ativação: remove caches antigos ──
 self.addEventListener('activate', function(event) {
   console.log('[SW] Ativando versão: ' + CACHE_NAME);
   event.waitUntil(
@@ -32,10 +49,7 @@ self.addEventListener('activate', function(event) {
       return Promise.all(
         cacheNames
           .filter(function(name) { return name !== CACHE_NAME; })
-          .map(function(name) {
-            console.log('[SW] Removendo cache antigo: ' + name);
-            return caches.delete(name);
-          })
+          .map(function(name) { return caches.delete(name); })
       );
     }).then(function() {
       return self.clients.claim();
@@ -43,56 +57,64 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-// ── Intercepta requisições ──
 self.addEventListener('fetch', function(event) {
-  var url = event.request.url;
+  var request = event.request;
+  var url = request.url;
 
-  // Requisições externas (CDN, APIs) → sempre tenta a rede primeiro
-  var isExternal = (
-    url.includes('cdn.tailwindcss.com') ||
-    url.includes('esm.sh') ||
-    url.includes('unpkg.com') ||
-    url.includes('api.open-meteo.com') ||
-    url.includes('viacep.com.br') ||
-    url.includes('nominatim.openstreetmap.org') ||
-    url.includes('maps.google.com') ||
-    url.includes('script.google.com')
-  );
-
-  if (isExternal) {
-    // Network first para externos — se falhar, silencia (não quebra o app)
+  // Bibliotecas externas: cache-first depois da primeira utilização.
+  // Isso permite abrir o aplicativo sem internet após ele já ter sido carregado.
+  if (isHost(url, CDN_HOSTS)) {
     event.respondWith(
-      fetch(event.request).catch(function() {
-        return new Response('', { status: 503, statusText: 'Offline' });
+      caches.match(request).then(function(cached) {
+        if (cached) return cached;
+        return fetch(request).then(function(response) {
+          if (response && response.ok) {
+            var clone = response.clone();
+            caches.open(CACHE_NAME).then(function(cache) {
+              cache.put(request, clone);
+            });
+          }
+          return response;
+        });
       })
     );
     return;
   }
 
-  // Arquivos locais → Cache first (app funciona offline)
+  // APIs: rede primeiro, pois os dados precisam ser atuais.
+  // Se estiver offline, devolve uma resposta 503 previsível.
+  if (isHost(url, API_HOSTS)) {
+    event.respondWith(
+      fetch(request).catch(function() {
+        return new Response(JSON.stringify({ offline: true }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json; charset=utf-8' }
+        });
+      })
+    );
+    return;
+  }
+
+  // Arquivos locais: cache-first com atualização dos recursos novos.
   event.respondWith(
-    caches.match(event.request).then(function(cached) {
-      if (cached) {
-        return cached;
-      }
-      return fetch(event.request).then(function(response) {
-        // Salva no cache para próxima vez
-        if (response && response.status === 200) {
+    caches.match(request).then(function(cached) {
+      if (cached) return cached;
+
+      return fetch(request).then(function(response) {
+        if (response && response.status === 200 && response.type !== 'opaque') {
           var responseClone = response.clone();
           caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(event.request, responseClone);
+            cache.put(request, responseClone);
           });
         }
         return response;
       }).catch(function() {
-        // Fallback para o index.html se tudo falhar
         return caches.match('./index.html');
       });
     })
   );
 });
 
-// ── Recebe mensagens do app (ex: forçar atualização) ──
 self.addEventListener('message', function(event) {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
