@@ -1,0 +1,40 @@
+name: Integrar análise no index
+
+on:
+  push:
+    branches: [correcao/auditoria-pluviometro]
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: ${{ !contains(github.event.head_commit.message, '[analysis-integrated]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: correcao/auditoria-pluviometro
+          fetch-depth: 1
+      - name: Inserir script de análise no HTML
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          tag='<script src="analysis-integration.js"></script>'
+          if tag not in s:
+              marker='</body>'
+              if marker not in s:
+                  raise SystemExit('Não encontrei </body> no index.html')
+              s=s.replace(marker, tag+'\n'+marker, 1)
+              p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit da integração
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Integra análise e comparação no aplicativo [analysis-integrated]'
+          git push origin HEAD:correcao/auditoria-pluviometro
