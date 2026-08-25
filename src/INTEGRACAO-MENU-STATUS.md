@@ -1,0 +1,1 @@
+Integração do menu preparada sem substituir o index.html original. A versão do aplicativo será restaurada para o blob oficial da main antes da próxima integração incremental validada.
