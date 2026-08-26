@@ -24,13 +24,9 @@ jobs:
           s = p.read_text(encoding='utf-8')
           tag = '<script src="analysis-integration.js"></script>'
           marker = '</body>'
-          # Remove qualquer integração anterior, inclusive se ela tiver caído
-          # dentro de um template literal do relatório.
           s = s.replace(tag, '')
           if marker not in s:
               raise SystemExit('Não encontrei </body> no index.html')
-          # O index possui </body> dentro de um documento HTML gerado pelo
-          # relatório. Portanto, a integração deve usar o ÚLTIMO </body> real.
           head, tail = s.rsplit(marker, 1)
           s = head + tag + '\n' + marker + tail
           p.write_text(s, encoding='utf-8')
@@ -41,13 +37,12 @@ jobs:
           from pathlib import Path
           s = Path('index.html').read_text(encoding='utf-8')
           tag = '<script src="analysis-integration.js"></script>'
-          assert s.count(tag) == 1, f'Esperava 1 integração, encontrei {s.count(tag)}'
-          assert s.rfind(tag) < s.rfind('</body>'), 'Script não está no corpo final do documento'
-          # O script não pode aparecer dentro do template de impressão.
-          marker = 'printWindow.document.write(`'
-          if marker in s:
-              report = s.split(marker, 1)[1].split('`);', 1)[0]
-              assert tag not in report, 'Integração caiu dentro do relatório HTML'
+          assert s.count(tag) == 1
+          assert s.rfind(tag) < s.rfind('</body>')
+          report_marker = 'printWindow.document.write(`'
+          if report_marker in s:
+              report = s.split(report_marker, 1)[1].split('`);', 1)[0]
+              assert tag not in report
           PY
       - name: Commit da integração
         run: |
