@@ -16,19 +16,38 @@ jobs:
         with:
           ref: correcao/auditoria-pluviometro
           fetch-depth: 1
-      - name: Inserir script de análise no HTML
+      - name: Corrigir e inserir script de análise no HTML
         run: |
           python - <<'PY'
           from pathlib import Path
-          p=Path('index.html')
-          s=p.read_text(encoding='utf-8')
-          tag='<script src="analysis-integration.js"></script>'
-          if tag not in s:
-              marker='</body>'
-              if marker not in s:
-                  raise SystemExit('Não encontrei </body> no index.html')
-              s=s.replace(marker, tag+'\n'+marker, 1)
-              p.write_text(s, encoding='utf-8')
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          tag = '<script src="analysis-integration.js"></script>'
+          marker = '</body>'
+          # Remove qualquer integração anterior, inclusive se ela tiver caído
+          # dentro de um template literal do relatório.
+          s = s.replace(tag, '')
+          if marker not in s:
+              raise SystemExit('Não encontrei </body> no index.html')
+          # O index possui </body> dentro de um documento HTML gerado pelo
+          # relatório. Portanto, a integração deve usar o ÚLTIMO </body> real.
+          head, tail = s.rsplit(marker, 1)
+          s = head + tag + '\n' + marker + tail
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Validar posição da integração
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s = Path('index.html').read_text(encoding='utf-8')
+          tag = '<script src="analysis-integration.js"></script>'
+          assert s.count(tag) == 1, f'Esperava 1 integração, encontrei {s.count(tag)}'
+          assert s.rfind(tag) < s.rfind('</body>'), 'Script não está no corpo final do documento'
+          # O script não pode aparecer dentro do template de impressão.
+          marker = 'printWindow.document.write(`'
+          if marker in s:
+              report = s.split(marker, 1)[1].split('`);', 1)[0]
+              assert tag not in report, 'Integração caiu dentro do relatório HTML'
           PY
       - name: Commit da integração
         run: |
@@ -36,5 +55,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Integra análise e comparação no aplicativo [analysis-integrated]'
+          git commit -m 'Corrige integração da análise no HTML [analysis-integrated]'
           git push origin HEAD:correcao/auditoria-pluviometro
