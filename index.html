@@ -443,7 +443,7 @@ ${filtered.sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr><td>${formatDat
 </table>
 <div class="footer">Pluviômetro Digital &nbsp;|&nbsp; Dados registrados pelo usuário</div>
 <br/><button class="no-print" onclick="window.print()" style="padding:10px 24px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;">🖨️ Imprimir / Salvar PDF</button>
-<script src="analysis-integration.js"></script>
+
 </body></html>`);
         printWindow.document.close();
         setModal(null);
@@ -1284,5 +1284,6 @@ root.render(<App/>);
     });
   }
 </script>
+<script src="analysis-integration.js"></script>
 </body>
 </html>
