@@ -14,74 +14,66 @@ var SHEET_NAME = "Registros";
 var BACKUP_FOLDER_NAME = "Pluviometro Backups";
 var SPREADSHEET_NAME = "Pluviometro Digital";
 
-// ================================================
-// ENDPOINT PRINCIPAL - recebe dados do app
-// ================================================
 function doPost(e) {
   try {
-    var raw = e.postData ? e.postData.contents : "";
-    if (!raw) {
-      return respond({ status: "error", message: "Sem dados recebidos" });
-    }
+    var raw = e && e.postData ? e.postData.contents : "";
+    if (!raw) return respond({ status: "error", message: "Sem dados recebidos" });
 
     var data = JSON.parse(raw);
+    validatePayload(data);
 
     saveJsonToDrive(data);
+    var added = data.entries.length ? saveToSheet(data) : 0;
 
-    var added = 0;
-    if (data.entries && data.entries.length > 0) {
-      added = saveToSheet(data);
-    }
-
-    return respond({ status: "ok", saved: added, timestamp: new Date().toISOString() });
-
+    return respond({
+      status: "ok",
+      received: data.entries.length,
+      saved: added,
+      timestamp: new Date().toISOString()
+    });
   } catch (err) {
-    return respond({ status: "error", message: err.toString() });
+    return respond({ status: "error", message: String(err && err.message ? err.message : err) });
   }
 }
 
-// ================================================
-// ENDPOINT GET - teste de conectividade
-// ================================================
 function doGet(e) {
   return respond({ status: "ok", message: "Pluviometro Backup API ativa!", timestamp: new Date().toISOString() });
 }
 
-// ================================================
-// HELPER - resposta JSON
-// ================================================
 function respond(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
-// ================================================
-// SALVA JSON NO GOOGLE DRIVE
-// ================================================
+// Valida o formato antes de gravar qualquer coisa.
+function validatePayload(data) {
+  if (!data || typeof data !== "object") throw new Error("Payload invalido");
+  if (!Array.isArray(data.entries)) throw new Error("Campo entries ausente ou invalido");
+  if (data.entries.length > 10000) throw new Error("Quantidade de registros excede o limite de 10000");
+
+  for (var i = 0; i < data.entries.length; i++) {
+    var e = data.entries[i] || {};
+    if (!e.id) throw new Error("Registro " + (i + 1) + " sem ID");
+    if (!e.date || !/^\d{4}-\d{2}-\d{2}$/.test(String(e.date))) {
+      throw new Error("Registro " + (i + 1) + " com data invalida");
+    }
+    var rain = Number(e.rain);
+    if (!isFinite(rain) || rain < 0) throw new Error("Registro " + (i + 1) + " com chuva invalida");
+  }
+}
+
 function saveJsonToDrive(data) {
   var folder = getOrCreateFolder(BACKUP_FOLDER_NAME);
   var dateStr = Utilities.formatDate(new Date(), "America/Sao_Paulo", "yyyy-MM-dd_HH-mm-ss");
   var filename = "backup_pluviometro_" + dateStr + ".json";
-  var content = JSON.stringify(data, null, 2);
-  folder.createFile(filename, content, MimeType.PLAIN_TEXT);
+  folder.createFile(filename, JSON.stringify(data, null, 2), MimeType.PLAIN_TEXT);
   cleanOldBackups(folder, 30);
 }
 
-// ================================================
-// BUSCA OU CRIA PASTA NO DRIVE
-// ================================================
 function getOrCreateFolder(name) {
   var folders = DriveApp.getFoldersByName(name);
-  if (folders.hasNext()) {
-    return folders.next();
-  }
-  return DriveApp.createFolder(name);
+  return folders.hasNext() ? folders.next() : DriveApp.createFolder(name);
 }
 
-// ================================================
-// REMOVE BACKUPS ANTIGOS
-// ================================================
 function cleanOldBackups(folder, maxFiles) {
   var files = [];
   var iter = folder.getFiles();
@@ -90,14 +82,9 @@ function cleanOldBackups(folder, maxFiles) {
     files.push({ file: f, date: f.getDateCreated() });
   }
   files.sort(function(a, b) { return a.date - b.date; });
-  while (files.length > maxFiles) {
-    files.shift().file.setTrashed(true);
-  }
+  while (files.length > maxFiles) files.shift().file.setTrashed(true);
 }
 
-// ================================================
-// SALVA REGISTROS NA PLANILHA
-// ================================================
 function saveToSheet(data) {
   var ss = getOrCreateSpreadsheet();
   var sheet = ss.getSheetByName(SHEET_NAME);
@@ -105,83 +92,72 @@ function saveToSheet(data) {
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
     var header = ["Data", "Hora", "Chuva (mm)", "Temp (C)", "Fenomeno", "Observacoes", "Cidade", "UF", "Importado em", "ID"];
-    sheet.appendRow(header);
+    sheet.getRange(1, 1, 1, header.length).setValues([header]);
     var headerRange = sheet.getRange(1, 1, 1, header.length);
-    headerRange.setFontWeight("bold");
-    headerRange.setBackground("#2563eb");
-    headerRange.setFontColor("#ffffff");
+    headerRange.setFontWeight("bold").setBackground("#2563eb").setFontColor("#ffffff");
     sheet.setFrozenRows(1);
     sheet.hideColumns(10);
   }
 
+  // Le IDs existentes de uma vez e tambem bloqueia duplicatas dentro do proprio lote.
   var lastRow = sheet.getLastRow();
   var existingIds = {};
   if (lastRow > 1) {
     var idValues = sheet.getRange(2, 10, lastRow - 1, 1).getValues();
     for (var i = 0; i < idValues.length; i++) {
-      existingIds[String(idValues[i][0])] = true;
+      var existingId = String(idValues[i][0] || "");
+      if (existingId) existingIds[existingId] = true;
     }
   }
 
   var now = Utilities.formatDate(new Date(), "America/Sao_Paulo", "dd/MM/yyyy HH:mm");
-  var added = 0;
   var entries = data.entries || [];
+  var rows = [];
 
   for (var j = 0; j < entries.length; j++) {
     var entry = entries[j];
-    var entryId = String(entry.id || "");
-    if (!existingIds[entryId]) {
-      sheet.appendRow([
-        entry.date     || "",
-        entry.time     || "",
-        entry.rain     || 0,
-        entry.temp     || 0,
-        (entry.phenomena && entry.phenomena !== "none") ? entry.phenomena : "",
-        entry.notes    || "",
-        entry.location || "",
-        entry.uf       || "",
-        now,
-        entryId
-      ]);
-      added++;
-    }
+    var entryId = String(entry.id);
+    if (existingIds[entryId]) continue;
+
+    existingIds[entryId] = true;
+    rows.push([
+      String(entry.date || ""),
+      String(entry.time || ""),
+      Number(entry.rain || 0),
+      entry.temp === "" || entry.temp == null ? "" : Number(entry.temp),
+      entry.phenomena && entry.phenomena !== "none" ? String(entry.phenomena) : "",
+      String(entry.notes || ""),
+      String(entry.location || ""),
+      String(entry.uf || ""),
+      now,
+      entryId
+    ]);
   }
 
-  if (added > 0) {
+  // Uma unica escrita reduz o risco de timeout e acelera lotes grandes.
+  if (rows.length) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 10).setValues(rows);
     formatSheet(sheet);
   }
 
-  return added;
+  return rows.length;
 }
 
-// ================================================
-// BUSCA OU CRIA PLANILHA
-// ================================================
 function getOrCreateSpreadsheet() {
   try {
     var active = SpreadsheetApp.getActiveSpreadsheet();
     if (active) return active;
-  } catch (e) {
-    // Script standalone, continua abaixo
-  }
+  } catch (e) {}
 
   var files = DriveApp.getFilesByName(SPREADSHEET_NAME);
-  if (files.hasNext()) {
-    return SpreadsheetApp.open(files.next());
-  }
-
+  if (files.hasNext()) return SpreadsheetApp.open(files.next());
   return SpreadsheetApp.create(SPREADSHEET_NAME);
 }
 
-// ================================================
-// FORMATA PLANILHA COM CORES ALTERNADAS
-// ================================================
 function formatSheet(sheet) {
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return;
-  for (var i = 2; i <= lastRow; i++) {
-    var color = (i % 2 === 0) ? "#f8fafc" : "#ffffff";
-    sheet.getRange(i, 1, 1, 9).setBackground(color);
-  }
+  var rows = sheet.getRange(2, 1, lastRow - 1, 9);
+  rows.setBackground("#ffffff");
   sheet.autoResizeColumns(1, 9);
 }

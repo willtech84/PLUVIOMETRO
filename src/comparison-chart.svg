@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420" role="img" aria-labelledby="title desc">
+<title id="title">Modelo de gráfico comparativo de chuva</title><desc id="desc">Barras verticais para comparar volume de chuva entre anos.</desc>
+<rect width="900" height="420" fill="white"/>
+<g stroke="#dbe3ef" stroke-width="1"><path d="M90 60H850M90 140H850M90 220H850M90 300H850M90 360H850"/></g>
+<g stroke="#334155" stroke-width="2"><path d="M90 40V360H850"/></g>
+<g font-family="Arial" font-size="16" fill="#334155"><text x="35" y="365">0</text><text x="25" y="305">25</text><text x="25" y="225">50</text><text x="25" y="145">75</text><text x="18" y="65">100</text><text x="105" y="395">2001</text><text x="350" y="395">2010</text><text x="595" y="395">2025</text><text x="355" y="30" font-size="20" font-weight="700">Comparação de chuva — Julho</text></g>
+<g fill="#2563eb"><rect x="120" y="200" width="110" height="160" rx="6"/><rect x="365" y="200" width="110" height="160" rx="6"/><rect x="610" y="104" width="110" height="256" rx="6"/></g>
+<g font-family="Arial" font-size="17" font-weight="700" fill="#0f172a"><text x="148" y="185">50 mm</text><text x="393" y="185">50 mm</text><text x="638" y="89">80 mm</text></g>
+</svg>

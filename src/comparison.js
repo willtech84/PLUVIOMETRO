@@ -1,0 +1,11 @@
+// Filtros e comparações históricas de chuva.
+export function filterEntries(entries, { years = [], months = [], from = '', to = '' } = {}) {
+  const yearSet=new Set(years.map(Number)), monthSet=new Set(months.map(Number));
+  return (entries||[]).filter(e=>{if(!e?.date)return false;const[y,m]=e.date.split('-').map(Number);if(yearSet.size&&!yearSet.has(y))return false;if(monthSet.size&&!monthSet.has(m))return false;if(from&&e.date<from)return false;if(to&&e.date>to)return false;return true;});
+}
+export function monthlyTotals(entries){const totals=new Map();(entries||[]).forEach(e=>{const rain=Number(e.rain);if(!e?.date||!Number.isFinite(rain))return;const[y,m]=e.date.split('-').map(Number),key=`${y}-${String(m).padStart(2,'0')}`;totals.set(key,(totals.get(key)||0)+rain)});return[...totals.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([key,rain])=>{const[year,month]=key.split('-').map(Number);return{key,year,month,rain:Number(rain.toFixed(2))}})}
+export function compareMonthByYears(entries,month,years){return years.map(Number).filter(Number.isInteger).sort((a,b)=>a-b).map(year=>{const rows=filterEntries(entries,{years:[year],months:[month]});return{year,month:Number(month),rain:Number(rows.reduce((s,e)=>s+(Number(e.rain)||0),0).toFixed(2)),records:rows.length}})}
+export function compareStats(entries,{years=[],months=[]}={}){const filtered=filterEntries(entries,{years,months}),groups=new Map();filtered.forEach(e=>{const year=Number(e.date.slice(0,4)),g=groups.get(year)||{year,rain:0,records:0,rainyDays:new Set};g.rain+=Number(e.rain)||0;g.records++;g.rainyDays.add(e.date);groups.set(year,g)});return[...groups.values()].sort((a,b)=>a.year-b.year).map(g=>({year:g.year,rain:Number(g.rain.toFixed(2)),records:g.records,rainyDays:g.rainyDays.size}))}
+export function comparePeriods(entries,periods=[]){return periods.map(p=>{const rows=filterEntries(entries,{years:[p.year],months:[p.month]});return{...p,rain:Number(rows.reduce((s,e)=>s+(Number(e.rain)||0),0).toFixed(2)),records:rows.length}})}
+export function availableYears(entries){return[...new Set((entries||[]).map(e=>Number(e.date?.slice(0,4))).filter(Number.isFinite))].sort((a,b)=>b-a)}
+export function availableMonths(entries){return[...new Set((entries||[]).map(e=>Number(e.date?.slice(5,7))).filter(Number.isFinite))].sort((a,b)=>a-b)}
