@@ -59,3 +59,6 @@ export function dedupeEntries(entries) {
     seenIds.add(String(entry.id)); seenKeys.add(key); return true;
   });
 }
+
+// Alias mantido para compatibilidade com testes/consumidores que esperam este nome.
+export const deduplicateEntries = dedupeEntries;
