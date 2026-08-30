@@ -5,7 +5,7 @@
 var CACHE_NAME = 'pluviometro-v1.4.1';
 var ASSETS_TO_CACHE = ['./','./index.html','./manifest.json','./src/menu-integration.js'];
 var CDN_HOSTS = ['cdn.tailwindcss.com','esm.sh','unpkg.com'];
-var API_HOSTS = ['api.open-meteo.com','viacep.com.br','nominatim.openstreetmap.org','maps.google.com','script.google.com'];
+var API_HOSTS = ['api.open-meteo.com','archive-api.open-meteo.com','viacep.com.br','nominatim.openstreetmap.org','maps.google.com','script.google.com'];
 function isHost(url,hosts){try{return hosts.indexOf(new URL(url).hostname)!==-1;}catch(e){return false;}}
 self.addEventListener('install',function(event){event.waitUntil(caches.open(CACHE_NAME).then(function(cache){return cache.addAll(ASSETS_TO_CACHE);}).then(function(){return self.skipWaiting();}));});
 self.addEventListener('activate',function(event){event.waitUntil(caches.keys().then(function(names){return Promise.all(names.filter(function(name){return name!==CACHE_NAME;}).map(function(name){return caches.delete(name);}));}).then(function(){return self.clients.claim();}));});
