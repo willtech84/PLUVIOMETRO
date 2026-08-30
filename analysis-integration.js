@@ -24,6 +24,7 @@
     };
     panel.querySelector('#pluv-close').onclick=()=>panel.remove(); panel.querySelectorAll('select').forEach(x=>x.onchange=update); update();
   }
-  function install(){ if(document.getElementById(BUTTON_ID)) return; const b=document.createElement('button'); b.id=BUTTON_ID; b.type='button'; b.textContent='📊 Análise / Comparação'; b.style='position:fixed;right:18px;bottom:18px;z-index:9998;padding:12px 16px;border:0;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;box-shadow:0 4px 12px #94a3b8;cursor:pointer'; b.onclick=render; document.body.appendChild(b); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install); else install();
+  // Não cria mais botão flutuante global — expõe a função para o app React
+  // chamar a partir de um botão fixo dentro da aba Ferramentas.
+  window.PluvAnalysis = { open: render };
 })();
