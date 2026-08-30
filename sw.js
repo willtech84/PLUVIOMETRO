@@ -1,8 +1,8 @@
 // ================================================
 // SERVICE WORKER — Pluviômetro Digital
-// Versão: 1.4.1 — força atualização de cache em todos os dispositivos
+// Versão: 1.4.2 — novo ícone do app
 // ================================================
-var CACHE_NAME = 'pluviometro-v1.4.1';
+var CACHE_NAME = 'pluviometro-v1.4.2';
 var ASSETS_TO_CACHE = ['./','./index.html','./manifest.json','./src/menu-integration.js'];
 var CDN_HOSTS = ['cdn.tailwindcss.com','esm.sh','unpkg.com'];
 var API_HOSTS = ['api.open-meteo.com','archive-api.open-meteo.com','viacep.com.br','nominatim.openstreetmap.org','maps.google.com','script.google.com'];
