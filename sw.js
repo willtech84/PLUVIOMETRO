@@ -1,9 +1,9 @@
 // ================================================
 // SERVICE WORKER — Pluviômetro Digital
-// Versão: 1.4.2 — novo ícone do app
+// Versão: 1.4.3 — corrige bug de Content-Encoding causando exibição de texto cru
 // ================================================
-var CACHE_NAME = 'pluviometro-v1.4.2';
-var ASSETS_TO_CACHE = ['./','./index.html','./manifest.json','./src/menu-integration.js'];
+var CACHE_NAME = 'pluviometro-v1.4.3';
+var ASSETS_TO_CACHE = ['./','./index.html','./manifest.json'];
 var CDN_HOSTS = ['cdn.tailwindcss.com','esm.sh','unpkg.com'];
 var API_HOSTS = ['api.open-meteo.com','archive-api.open-meteo.com','viacep.com.br','nominatim.openstreetmap.org','maps.google.com','script.google.com'];
 function isHost(url,hosts){try{return hosts.indexOf(new URL(url).hostname)!==-1;}catch(e){return false;}}
@@ -13,13 +13,8 @@ self.addEventListener('fetch',function(event){
   var request=event.request,url=request.url;
   if(new URL(url).pathname.endsWith('/index.html') || new URL(url).pathname==='/' ){
     event.respondWith(fetch(request).then(function(response){
-      if(!response || !response.ok)return response;
-      return response.text().then(function(html){
-        if(html.indexOf('src/menu-integration.js')===-1){html=html.replace('</body>','<script src="./src/menu-integration.js"></script>\\n</body>');}
-        var transformed=new Response(html,{status:response.status,statusText:response.statusText,headers:response.headers});
-        caches.open(CACHE_NAME).then(function(cache){cache.put(request,transformed.clone());});
-        return transformed;
-      });
+      if(response&&response.ok){var clone=response.clone();caches.open(CACHE_NAME).then(function(cache){cache.put(request,clone);});}
+      return response;
     }).catch(function(){return caches.match(request).then(function(cached){return cached||caches.match('./index.html');});}));
     return;
   }
